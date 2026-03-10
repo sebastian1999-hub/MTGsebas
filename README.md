@@ -5,11 +5,33 @@ Sitio web simple para:
 1. Importar mazos desde un archivo JSON.
 2. Mostrar una colección por comandante (con imagen).
 3. Desplegar cada mazo al hacer clic, agrupando cartas por tipos.
-4. Guardar la colección en `localStorage` para recuperarla al recargar.
+4. Guardar la colección en backend (`decks-db.json`) para recuperarla entre recargas/dispositivos.
+
+## Persistencia (importante)
+
+- Si ejecutas con `server.js`, la app guarda en `decks-db.json` (lado servidor).
+- Así no depende del caché del navegador y puede compartirse entre dispositivos apuntando al mismo servidor.
+- Si abres `index.html` directamente sin servidor, la app cae a `localStorage` como respaldo.
+
+## Ejecutar con backend (recomendado)
+
+1. Ejecuta:
+
+`node server.js`
+
+2. Abre:
+
+`http://localhost:3000`
+
+3. Para usar desde otro dispositivo en la misma red, abre:
+
+`http://IP_DE_TU_PC:3000`
+
+Los datos quedan en `decks-db.json`.
 
 ## Ejecutar
 
-Abre `index.html` en tu navegador.
+Puedes seguir abriendo `index.html` directo, pero en ese modo se usa `localStorage`.
 
 - `index.html`: página principal de colección.
 - `importar.html`: página secundaria para importar mazos.

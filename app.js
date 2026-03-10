@@ -9,10 +9,17 @@ const progressLabel = document.querySelector('#progressLabel');
 const progressValue = document.querySelector('#progressValue');
 const progressFill = document.querySelector('#progressFill');
 const STORAGE_KEY = 'mtg-commander-decks';
+const SERVER_API_URL = '/api/decks';
+const SUPABASE_URL =
+  (window.MTG_SUPABASE_URL || 'https://hzsxlpzsknysjdpodpgg.supabase.co').replace(/\/$/, '');
+const SUPABASE_ANON_KEY =
+  window.MTG_SUPABASE_ANON_KEY || localStorage.getItem('mtg-supabase-anon-key') || '';
+const SUPABASE_TABLE = 'decks';
 const TXT_LINE_REGEX = /^(\d+)x\s+(.+?)\s+\([^)]*\)\s+\d+\s+\[(.+)]$/;
 const scryfallCache = new Map();
 let currentDecks = [];
 let openedDeckIndex = null;
+let persistenceMode = 'local';
 
 const TYPE_ORDER = [
   'Commander',
@@ -26,7 +33,14 @@ const TYPE_ORDER = [
   'Other',
 ];
 
-initialize();
+initialize().catch((error) => {
+  console.error(error);
+  const storedDecks = loadDecksFromStorage();
+  currentDecks = storedDecks;
+  if (deckCollection) {
+    renderDecks(currentDecks);
+  }
+});
 
 if (fileInput) {
   fileInput.addEventListener('change', async (event) => {
@@ -39,7 +53,7 @@ if (fileInput) {
       const text = await file.text();
       const parsed = JSON.parse(text);
       const decks = await normalizeAndEnrichDecks(parsed, 'Completando cartas del JSON');
-      setDecks(decks);
+      await setDecks(decks);
       if (!deckCollection) {
         window.location.href = 'index.html';
       }
@@ -71,7 +85,7 @@ if (importTxtButton && txtFileInput) {
       const text = await file.text();
       const txtDeck = await buildDeckFromTxt(text);
       const decks = await normalizeAndEnrichDecks([txtDeck], 'Comprobando datos del mazo');
-      setDecks(decks);
+      await setDecks(decks);
       if (!deckCollection) {
         window.location.href = 'index.html';
       }
@@ -86,22 +100,63 @@ if (importTxtButton && txtFileInput) {
   });
 }
 
-function initialize() {
-  const storedDecks = loadDecksFromStorage();
-  if (storedDecks.length === 0) return;
+async function initialize() {
+  if (hasSupabaseConfig()) {
+    const supabaseDecks = await loadDecksFromSupabase();
+    if (supabaseDecks) {
+      persistenceMode = 'supabase';
+      currentDecks = supabaseDecks;
+    }
+  }
 
-  currentDecks = storedDecks;
+  if (persistenceMode !== 'supabase') {
+  const serverDecks = await loadDecksFromServer();
+    if (serverDecks) {
+      persistenceMode = 'server';
+      currentDecks = serverDecks;
+    } else {
+      persistenceMode = 'local';
+      currentDecks = loadDecksFromStorage();
+    }
+  }
+
   if (deckCollection) {
     renderDecks(currentDecks);
   }
 }
 
-function setDecks(decks) {
+async function setDecks(decks) {
   currentDecks = decks;
-  saveDecksToStorage(currentDecks);
+  await persistDecks(currentDecks);
   if (deckCollection) {
     renderDecks(currentDecks);
   }
+}
+
+async function persistDecks(decks) {
+  if (persistenceMode === 'supabase') {
+    try {
+      await saveDecksToSupabase(decks);
+      return;
+    } catch (error) {
+      console.error(error);
+      alert('No se pudo guardar en Supabase. Se intentará backend local.');
+      persistenceMode = 'server';
+    }
+  }
+
+  if (persistenceMode === 'server') {
+    try {
+      await saveDecksToServer(decks);
+      return;
+    } catch (error) {
+      console.error(error);
+      alert('No se pudo guardar en el servidor. Se usará guardado local en este navegador.');
+      persistenceMode = 'local';
+    }
+  }
+
+  saveDecksToStorage(decks);
 }
 
 function loadDecksFromStorage() {
@@ -124,6 +179,177 @@ function loadDecksFromStorage() {
 
 function saveDecksToStorage(decks) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
+}
+
+function hasSupabaseConfig() {
+  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+}
+
+function getSupabaseHeaders(extra = {}) {
+  return {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  };
+}
+
+function mapSupabaseRowToDeck(row) {
+  if (row && typeof row.payload === 'object' && row.payload !== null) {
+    return row.payload;
+  }
+
+  if (row?.commander && Array.isArray(row?.cards)) {
+    return row;
+  }
+
+  const mainboard = Array.isArray(row?.mainboard) ? row.mainboard : [];
+  const cards = mainboard.map((card) => ({
+    name: String(card?.name || ''),
+    type: typeof card?.type === 'string' && card.type ? card.type : 'Other',
+    quantity: Number(card?.quantity) > 0 ? Number(card.quantity) : 1,
+    image: typeof card?.image === 'string' ? card.image : '',
+  }));
+
+  const commanderCard = cards.find((card) => card.type === 'Commander');
+  const commanderName = String(row?.commander || commanderCard?.name || 'Commander');
+
+  return {
+    name: String(row?.name || 'Mazo sin nombre'),
+    commander: {
+      name: commanderName,
+      image: commanderCard?.image || '',
+    },
+    cards,
+  };
+}
+
+function mapDeckToSupabaseRow(deck) {
+  return {
+    name: deck.name,
+    format: 'commander',
+    commander: deck.commander?.name || '',
+    mainboard: Array.isArray(deck.cards) ? deck.cards : [],
+    sideboard: [],
+    notes: null,
+  };
+}
+
+async function loadDecksFromSupabase() {
+  try {
+    const query = `select=*&order=created_at.asc`;
+    const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?${query}`;
+    const response = await fetch(url, {
+      headers: getSupabaseHeaders({ Accept: 'application/json' }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const rows = await response.json();
+    const decks = Array.isArray(rows) ? rows.map(mapSupabaseRowToDeck) : [];
+    return sanitizeStoredDecks(decks);
+  } catch {
+    return null;
+  }
+}
+
+async function saveDecksToSupabase(decks) {
+  const baseUrl = `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`;
+
+  const deleteResponse = await fetch(`${baseUrl}?id=not.is.null`, {
+    method: 'DELETE',
+    headers: getSupabaseHeaders({ Prefer: 'return=minimal' }),
+  });
+
+  if (!deleteResponse.ok) {
+    throw new Error(`Error limpiando mazos en Supabase (${deleteResponse.status})`);
+  }
+
+  if (!Array.isArray(decks) || decks.length === 0) {
+    return;
+  }
+
+  const payload = decks.map(mapDeckToSupabaseRow);
+  const insertResponse = await fetch(baseUrl, {
+    method: 'POST',
+    headers: getSupabaseHeaders({ Prefer: 'return=minimal' }),
+    body: JSON.stringify(payload),
+  });
+
+  if (!insertResponse.ok) {
+    throw new Error(`Error guardando mazos en Supabase (${insertResponse.status})`);
+  }
+}
+
+async function loadDecksFromServer() {
+  try {
+    const response = await fetch(SERVER_API_URL, {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return sanitizeStoredDecks(data);
+  } catch {
+    return null;
+  }
+}
+
+async function saveDecksToServer(decks) {
+  const response = await fetch(SERVER_API_URL, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(decks),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error guardando mazos en backend (${response.status})`);
+  }
+}
+
+function sanitizeStoredDecks(rawDecks) {
+  if (!Array.isArray(rawDecks)) {
+    throw new Error('Los datos guardados deben contener un array de mazos.');
+  }
+
+  return rawDecks.map((deck, deckIndex) => {
+    if (!deck?.name || !deck?.commander?.name || !Array.isArray(deck.cards)) {
+      throw new Error(`Mazo inválido en posición ${deckIndex + 1}.`);
+    }
+
+    return {
+      name: String(deck.name),
+      commander: {
+        name: String(deck.commander.name),
+        image: typeof deck.commander.image === 'string' ? deck.commander.image : '',
+      },
+      cards: deck.cards.map((card, cardIndex) => {
+        if (!card?.name) {
+          throw new Error(
+            `Carta inválida en "${deck.name}" (posición ${cardIndex + 1}).`
+          );
+        }
+
+        const quantity = Number(card.quantity);
+        return {
+          name: String(card.name),
+          type: typeof card.type === 'string' && card.type ? card.type : 'Other',
+          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+          image: typeof card.image === 'string' ? card.image : '',
+        };
+      }),
+    };
+  });
 }
 
 async function normalizeAndEnrichDecks(rawData, progressText) {
@@ -503,7 +729,9 @@ function deleteDeck(deckIndex) {
   if (!accepted) return;
 
   const nextDecks = currentDecks.filter((_, index) => index !== deckIndex);
-  setDecks(nextDecks);
+  setDecks(nextDecks).catch((error) => {
+    alert(`No se pudo actualizar la colección: ${error.message}`);
+  });
 }
 
 function deleteCard(deckIndex, cardToDelete) {
@@ -518,7 +746,9 @@ function deleteCard(deckIndex, cardToDelete) {
     };
   });
 
-  setDecks(nextDecks);
+  setDecks(nextDecks).catch((error) => {
+    alert(`No se pudo actualizar la colección: ${error.message}`);
+  });
 }
 
 function groupCardsByType(cards) {
