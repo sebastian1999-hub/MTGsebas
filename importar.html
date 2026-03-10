@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Importar mazos - Commander Deck Importer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Importar mazos MTG Commander</h1>
+      <p>Sube JSON o TXT y busca cartas automáticamente en Scryfall.</p>
+    </header>
+
+    <main class="container">
+      <section class="toolbar">
+        <a class="btn btn-secondary" href="index.html">Volver a colección</a>
+      </section>
+
+      <section class="import-panel">
+        <h2>Importar mazos</h2>
+        <input id="jsonFileInput" type="file" accept="application/json,.json" />
+        <p class="help-text">
+          Formato esperado: array de mazos con <strong>name</strong>,
+          <strong>commander</strong> y <strong>cards</strong>.
+        </p>
+
+        <input
+          id="txtFileInput"
+          class="hidden-input"
+          type="file"
+          accept="text/plain,.txt"
+        />
+        <button id="importTxtButton" class="btn btn-secondary" type="button">
+          Importar desde TXT
+        </button>
+
+        <div id="progressWrapper" class="progress-wrapper" hidden>
+          <div class="progress-meta">
+            <span id="progressLabel">Buscando cartas...</span>
+            <span id="progressValue">0%</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

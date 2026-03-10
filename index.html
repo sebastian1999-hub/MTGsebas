@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Commander Deck Importer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Mazos  MTG </h1>
+     
+    </header>
+
+    <main class="container">
+      <section class="toolbar">
+        <a class="btn btn-primary" href="importar.html">Ir a importar mazos</a>
+      </section>
+
+      <section>
+        <h2>Colección</h2>
+        <div id="deckCollection" class="deck-grid"></div>
+        <p id="emptyState" class="empty-state">Aún no has importado mazos.</p>
+      </section>
+    </main>
+
+    <template id="deckCardTemplate">
+      <article class="deck-card">
+        <button class="deck-header" type="button" aria-expanded="false">
+          <img class="commander-image" alt="" />
+          <div class="deck-meta">
+            <h3 class="deck-name"></h3>
+            <p class="commander-name"></p>
+          </div>
+          <span class="toggle-indicator">▾</span>
+        </button>
+        <div class="deck-content" hidden></div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

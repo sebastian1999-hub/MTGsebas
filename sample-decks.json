@@ -1,0 +1,35 @@
+[
+  {
+    "name": "Aesi Ramp",
+    "commander": {
+      "name": "Aesi, Tyrant of Gyre Strait",
+      "image": "https://cards.scryfall.io/normal/front/d/2/d2fdaf89-662a-4dd9-9f2b-a6f7db2ffaf6.jpg"
+    },
+    "cards": [
+      { "name": "Cultivate", "type": "Sorcery", "quantity": 1 },
+      { "name": "Kodama's Reach", "type": "Sorcery", "quantity": 1 },
+      { "name": "Solemn Simulacrum", "type": "Artifact Creature", "quantity": 1 },
+      { "name": "Counterspell", "type": "Instant", "quantity": 1 },
+      { "name": "Beast Within", "type": "Instant", "quantity": 1 },
+      { "name": "Sol Ring", "type": "Artifact", "quantity": 1 },
+      { "name": "Simic Growth Chamber", "type": "Land", "quantity": 1 },
+      { "name": "Island", "type": "Land", "quantity": 12 },
+      { "name": "Forest", "type": "Land", "quantity": 12 }
+    ]
+  },
+  {
+    "name": "Atraxa Superfriends",
+    "commander": {
+      "name": "Atraxa, Praetors' Voice",
+      "image": "https://cards.scryfall.io/normal/front/1/c/1c39ec56-fde3-4e5c-b6fc-bcd5db21b2c5.jpg"
+    },
+    "cards": [
+      { "name": "Teferi, Hero of Dominaria", "type": "Planeswalker", "quantity": 1 },
+      { "name": "Swords to Plowshares", "type": "Instant", "quantity": 1 },
+      { "name": "Damn", "type": "Sorcery", "quantity": 1 },
+      { "name": "Arcane Signet", "type": "Artifact", "quantity": 1 },
+      { "name": "Smothering Tithe", "type": "Enchantment", "quantity": 1 },
+      { "name": "Command Tower", "type": "Land", "quantity": 1 }
+    ]
+  }
+]
