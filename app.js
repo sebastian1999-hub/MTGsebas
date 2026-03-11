@@ -53,7 +53,7 @@ if (fileInput) {
       const text = await file.text();
       const parsed = JSON.parse(text);
       const decks = await normalizeAndEnrichDecks(parsed, 'Completando cartas del JSON');
-      await setDecks(decks);
+      await appendDecks(decks);
       if (!deckCollection) {
         window.location.href = 'index.html';
       }
@@ -85,7 +85,7 @@ if (importTxtButton && txtFileInput) {
       const text = await file.text();
       const txtDeck = await buildDeckFromTxt(text);
       const decks = await normalizeAndEnrichDecks([txtDeck], 'Comprobando datos del mazo');
-      await setDecks(decks);
+      await appendDecks(decks);
       if (!deckCollection) {
         window.location.href = 'index.html';
       }
@@ -131,6 +131,45 @@ async function setDecks(decks) {
   if (deckCollection) {
     renderDecks(currentDecks);
   }
+}
+
+async function appendDecks(importedDecks) {
+  const mergedDecks = mergeDeckCollections(currentDecks, importedDecks);
+  await setDecks(mergedDecks);
+}
+
+function mergeDeckCollections(existingDecks, importedDecks) {
+  const mergedDecks = [...existingDecks];
+  const indexByKey = new Map();
+
+  for (const [index, deck] of mergedDecks.entries()) {
+    indexByKey.set(getDeckKey(deck), index);
+  }
+
+  for (const deck of importedDecks) {
+    const key = getDeckKey(deck);
+    const existingIndex = indexByKey.get(key);
+
+    if (typeof existingIndex === 'number') {
+      mergedDecks[existingIndex] = deck;
+      continue;
+    }
+
+    indexByKey.set(key, mergedDecks.length);
+    mergedDecks.push(deck);
+  }
+
+  return mergedDecks;
+}
+
+function getDeckKey(deck) {
+  const deckName = normalizeDeckKeyPart(deck?.name);
+  const commanderName = normalizeDeckKeyPart(deck?.commander?.name);
+  return `${deckName}::${commanderName}`;
+}
+
+function normalizeDeckKeyPart(text) {
+  return String(text || '').trim().toLowerCase();
 }
 
 async function persistDecks(decks) {
